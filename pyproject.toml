@@ -1,14 +1,19 @@
 [tool.poetry]
 name = "simple-pivot"
-version = "0.0.0"
+version = "0.1.2"
 description = "Make pivots like in Excel"
 authors = ["Petrov Mikhail <petrov.ma@icloud.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/ma-petrov/simple-pivot"
+packages = [{include = "simple_pivot"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"
+pandas = "^2.2.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
 
 [build-system]
 requires = ["poetry-core"]

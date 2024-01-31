@@ -1,6 +1,5 @@
-from typing import Any, Callable, Dict, Iterable, List, Optional, TypeVar
+from typing import Callable, List, Optional, Union
 from pandas import DataFrame, MultiIndex, concat
-from pandas.io.formats.style import Styler
 
 
 from simple_pivot.source import BaseSource
@@ -9,9 +8,9 @@ from simple_pivot.source import BaseSource
 class Config:
     def __init__(
         self,
-        rows: str | List[str],
-        vals: str | List[str],
-        cols: Optional[str | List[str]] = None,
+        rows: Union[str, List[str]],
+        vals: Union[str, List[str]],
+        cols: Optional[Union[str, List[str]]] = None,
         agg_func: Optional[str] = None,
     ):
         self._rows = rows if isinstance(rows, List) else [rows]
@@ -31,33 +30,26 @@ class Pivot:
     def __init__(
         self,
         config: Config,
-        source: Optional[DataFrame | BaseSource] = None,
+        source: Optional[DataFrame] = None,
     ):
         self._config = config
-        self._source = source
-        self._source_is_changed = source is not None,
-        self._data = None
+        self._data = source
 
-    def set_source(self, source: Config) -> None:
-        self._source = source
-        self._source_is_changed = True
+    def set_source(self, source: DataFrame) -> None:
+        self._data = source
 
-    def show(self) -> Styler:
+    def show(self) -> DataFrame:
         """Вычисляет и отображает сводную таблицу.
         
         :return: html объект с отображением сводной таблицы
         """
-        if self._data is None or self._source_is_changed:
-            self._data = self._source.load()
-            self._source_is_changed = False
-
-        self._make_pivot()
+        return self._make_pivot()
 
     def _agg_computable_expression(
         self,
         dataframe: DataFrame,
         exp: Callable,
-        by: Optional[str | List[str]] = None,
+        by: Optional[Union[str, List[str]]] = None,
         agg_func: Optional[str] = None,
     ) -> DataFrame:
         """Аггрегирует несколько колонок в одно значение.
@@ -92,8 +84,8 @@ class Pivot:
     def _agg_val(
         self,
         dataframe: DataFrame,
-        val: List[str | Callable],
-        by: Optional[List[str]] = None,
+        val: List[Union[str, Callable]],
+        by: Optional[Union[str, List[str]]] = None,
         agg_func: Optional[str] = None,
     ) -> DataFrame:
         """Возвращает аггрегаты"""
