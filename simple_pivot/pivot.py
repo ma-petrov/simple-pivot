@@ -1,31 +1,41 @@
-from typing import Callable, List, Optional, Union
-from pandas import DataFrame, MultiIndex, concat
+from typing import Dict, List, Optional, Union
+from pandas import DataFrame, Index, MultiIndex, concat, melt
 
-
-from simple_pivot.source import BaseSource
+from simple_pivot.agg_val import AggVal
 
 
 class Config:
+    IN_COLS = "IN_COLS"
+    IN_ROWS = "IN_ROWS"
+
     def __init__(
         self,
-        rows: Union[str, List[str]],
-        vals: Union[str, List[str]],
+        vals: List[AggVal],
+        rows: Optional[Union[str, List[str]]] = None,
         cols: Optional[Union[str, List[str]]] = None,
-        agg_func: Optional[str] = None,
+        vals_position: Optional[str] = None,
     ):
-        self._rows = rows if isinstance(rows, List) else [rows]
-        self._vals = vals if isinstance(vals, List) else [vals]
+        if rows is None and cols is None:
+            raise ValueError('At least on of rows of cols must be passed.')
+
+        self._rows = None
+        if rows:
+            self._rows = rows if isinstance(rows, List) else [rows]
         
         self._cols = None
         if cols:
             self._cols = cols if isinstance(cols, List) else [cols]
-        
-        self._agg_func = agg_func or 'sum'
+
+        self._vals = vals
+        self._vals_position = vals_position or self.IN_COLS
 
 
 class Pivot:
     TOTAL = "Total"
     VALUES = "Values"
+
+    INDEX = "index"
+    COLUMNS = "columns"
 
     def __init__(
         self,
@@ -44,133 +54,130 @@ class Pivot:
         :return: html объект с отображением сводной таблицы
         """
         return self._make_pivot()
-
-    def _agg_computable_expression(
+    
+    def _agg_dict(self) -> Dict[str, List[str]]:
+        """Собирает словарь со всеми аггрегируемыми колонками и функциями."""
+        agg = {}
+        for val in self._config._vals:
+            for col, agg_func in val.get_cols_to_aggregate().items():
+                agg[col] = agg.get(col, set()) | {agg_func}
+        return {k: list(v) for k, v in agg.items()}
+    
+    def _append_index_level(
         self,
         dataframe: DataFrame,
-        exp: Callable,
-        by: Optional[Union[str, List[str]]] = None,
-        agg_func: Optional[str] = None,
+        index_name: str,
+        level_name: Optional[str] = None,
+        axis: Optional[str] = None,
     ) -> DataFrame:
-        """Аггрегирует несколько колонок в одно значение.
+        level_name = level_name or ""
+        axis = axis or self.INDEX
         
-        Вычистляет аггрегированные значения нескольких столбцов, затем применяет их
-        рузультаты в функции expression. Названия аргументов функции соответствуют
-        названиям столбцов.
+        index: Union[Index, MultiIndex] = getattr(dataframe, axis)
 
-        :param data: dataframe.
-        :param expression: функция вычислимого выражения.
-        :param agg_func: функция аггрегации, применяющаяся отдельно для каждого
-        столбца.
-
-        :return: результат аггрегации. 
-        """
-        name = exp.__name__
-        agg_func = agg_func or "sum"
-        col_names = exp.__code__.co_varnames
-
-        if by is None:
-            aggregated = dataframe.aggregate({c: agg_func for c in col_names})
+        if isinstance(index, MultiIndex):
+            columns = [(index_name, *c) for c in index]
+            names = (level_name, *index.names)
         else:
-            aggregated = (
-                dataframe
-                .groupby(by)
-                .aggregate({c: agg_func for c in col_names})
-            )
+            columns = [(index_name, c) for c in index]
+            names = (level_name, index.name)
 
-        aggregated[name] = aggregated.apply(lambda r: exp(*r.values), axis=1)
-        return aggregated.reset_index()[by + [name]]
-    
-    def _agg_val(
+        appended_index = MultiIndex.from_tuples(columns, names=names)
+        setattr(dataframe, axis, appended_index)
+        return dataframe
+
+    def _aggregate(
         self,
         dataframe: DataFrame,
-        val: List[Union[str, Callable]],
         by: Optional[Union[str, List[str]]] = None,
-        agg_func: Optional[str] = None,
+        values_axis: Optional[str] = None,
     ) -> DataFrame:
-        """Возвращает аггрегаты"""
-        if isinstance(val, Callable):
-            aggregated = self._agg_computable_expression(
-                dataframe, val, by, agg_func
-            )
-        else:
-            if by is None:
-                aggregated = dataframe.aggregate({val: agg_func})
+        """"""
+        values_axis = values_axis or self.COLUMNS
+        agg = self._agg_dict()
+
+        # Если не нужно группировать, создается фиктивная колонка Total с
+        # одинаковым значением.
+        if not by:
+            by = self.TOTAL
+            dataframe[self.TOTAL] = [self.TOTAL] * dataframe.shape[0]
+
+        # Сборка результирующих аггрегатов, для простых - копирование колонок,
+        # для вычислимых выражений применяется apply.
+        aggregated = dataframe.groupby(by).agg(agg)
+        result = DataFrame()
+
+        for val in self._config._vals:
+            if val.is_computable_expression:
+                cols = [(c, val.agg_func) for c in val.expression_arg_names]
+                result[val.name] = val.compute(aggregated[cols])
             else:
-                aggregated = (
-                    dataframe
-                    .groupby(by, as_index=False)
-                    .aggregate({val: agg_func})
-                )
-        return aggregated
+                result[val.name] = aggregated[(val.val, val.agg_func)]
+
+        return result        
+
+    def _merge(self, values: DataFrame, totals: DataFrame) -> DataFrame:
+        columns = [("", *c) for c in values.columns]
+        names = ("", *values.columns.names)
+        values.columns = MultiIndex.from_tuples(columns, names=names)
+
+        dump = [""] * (len(values.columns.names) - 2)
+        totals.columns = [(self.TOTAL, c, *dump) for c in totals.columns]
+
+        return concat([values, totals], axis=1)
     
-    def _set_top_column(self, dataframe: DataFrame, top_name: str) -> None:
-        name = dataframe.columns.name
-        name = [name] if isinstance(name, str) else name
-        names = ["", self.VALUES] + name
-        columns = [("", top_name, c) for c in dataframe.columns]
-        dataframe.columns = MultiIndex.from_tuples(columns, names=names)
-
-    def _total_index(self, rows: List[str]) -> tuple[str]:
-        sapces = [""] * (len(rows) - 1)
-        return (self.TOTAL, *sapces)
-
-    def _concat_agg_vals_and_cols_totals(
+    def _concat(self, values: DataFrame, totals: DataFrame) -> DataFrame:
+        if dump := [""] * (len(values.index.names) - 1):
+            totals.index = MultiIndex.from_tuples(
+                [(self.TOTAL, *dump)],
+                name=values.index.names
+            )
+        return concat([values, totals])
+    
+    def _melt(
         self,
-        rows: List[str],
+        dataframe: DataFrame,
         cols: List[str],
-        val: str,
-        agg_vals: DataFrame,
-        agg_row_totals: DataFrame,
+        index: Optional[str] = None
     ) -> DataFrame:
-        total = agg_row_totals.set_index(cols).T
-        pivot = agg_vals.pivot(index=rows, columns=cols, values=val)
-        pivot.loc[self._total_index(rows)] = total.loc[val]
-        self._set_top_column(pivot, val)
-        return pivot
+        index = index or self.VALUES
+        dataframe[index] = [index] * dataframe.shape[0]
+        dataframe = dataframe.reset_index().pivot(
+            index=index,
+            columns=cols,
+            values=[v.name for v in self._config._vals],
+        )
+        dataframe.index.name = None
+        return dataframe
 
     def _make_pivot(self) -> DataFrame:
         rows = self._config._rows
         cols = self._config._cols
-        vals = self._config._vals
-        agg_func = self._config._agg_func
+        
+        values = self._aggregate(self._data, by=(rows or []) + (cols or []))
+        totals = self._aggregate(self._data)
 
-        pivot_segments = []
+        # Заданы столбцы
+        if cols is None:
+            return self._concat(values, totals)
 
-        for val in vals:
-            by = rows + cols if cols else rows
-            agg_vals = self._agg_val(
-                self._data, val, by=by, agg_func=agg_func
-            )
-            agg_col_totals = self._agg_val(
-                self._data, val, by=cols, agg_func=agg_func
-            )
-            val_name = val.__name__ if isinstance(val, Callable) else val
-
-            if cols:
-                pivot_segment = self._concat_agg_vals_and_cols_totals(
-                    rows, cols, val_name, agg_vals, agg_col_totals
-                )
-            else:
-                total = agg_col_totals[val_name]
-                pivot_segment = agg_vals.set_index(rows)
-                pivot_segment.columns.name = self.VALUES
-                pivot_segment.loc[self._total_index(rows), val_name] = total
-            pivot_segments.append(pivot_segment)
-
-        if cols:
-            for val in vals:
-                val_name = val.__name__ if isinstance(val, Callable) else val
-                total = self._agg_val(self._data, val, by=rows, agg_func=agg_func)
-                total.set_index(rows, inplace=True)
-                total.loc[self.TOTAL] = self._agg_val(
-                    self._data, val, agg_func=agg_func
-                )
-                dump = ["" for _ in range(len(cols))]
-                total.columns = MultiIndex.from_tuples(
-                    [("Total", val, *dump)],
-                    names=["", "Values", *dump]
-                )
-                pivot_segments.append(total)
-
-        return concat(pivot_segments, axis=1)
+        # Заданы строки
+        if rows is None:
+            values = self._melt(values, cols)
+            totals.index = [self.VALUES]
+            return self._merge(values, totals)
+        
+        # Заданы столбцы и строки
+        row_totals = self._aggregate(self._data, by=rows)
+        col_totals = self._aggregate(self._data, by=cols)
+        col_totals = self._melt(col_totals, cols, index=self.TOTAL)
+        values = values.reset_index().pivot(
+            index=rows,
+            columns=cols,
+            values=[v.name for v in self._config._vals]
+        )
+        
+        return self._concat(
+            self._merge(values, row_totals),
+            self._merge(col_totals, totals),
+        )
