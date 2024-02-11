@@ -1,0 +1,26 @@
+name: Python Lib Deploy Ci
+on:
+  workflow_dispatch:
+  push:
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  cancel-in-progress: true
+jobs:
+  run-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+          with:
+            python-version: '3.9'
+            architecture: 'x64'
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry shell
+          poetry update
+      - name: Lint with ruff
+        run: ruff --output-format=github .
+      - name: Test with pytest
+        run: pytest

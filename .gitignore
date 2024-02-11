@@ -1,6 +1,8 @@
+.vscode*
+
 *__pycache__*
 *.pytest_cache*
 *.ruff_cache*
-*.vscode*
-dist/*
 .env*
+
+dist/*
