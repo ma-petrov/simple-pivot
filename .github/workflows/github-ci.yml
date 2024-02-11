@@ -10,7 +10,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.x'
           architecture: 'x64'
       - name: Install dependencies
         run: |
@@ -21,3 +21,21 @@ jobs:
         run: ruff --output-format=github .
       - name: Test with pytest
         run: pytest
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          architecture: 'x64'
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry shell
+          poetry update
+      - name: Build and deploy
+        run: |
+          poetry build
+          poetry publish --username __token__ --password ${{ secrets.PYPI_TOKEN }}
