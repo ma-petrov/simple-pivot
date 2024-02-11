@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "simple-pivot"
-version = "0.1.4"
+version = "0.2.0"
 description = "Make pivots like in Excel"
 authors = ["Petrov Mikhail <petrov.ma@icloud.com>"]
 license = "MIT"
@@ -11,10 +11,56 @@ packages = [{include = "simple_pivot"}]
 [tool.poetry.dependencies]
 python = "^3.9"
 pandas = "^2.2.0"
+pydantic = "^2.6.1"
+jinja2 = "^3.1.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+ruff = "^0.2.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+cache-dir = "./.ruff_cache"
+exclude = [
+    ".git",
+    ".git-rewrite",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "build",
+    "dist",
+]
+src = ["simple_pivot", "tests"]
+
+line-length = 80
+indent-width = 4
+
+target-version = "py39"
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = []
+
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+skip-magic-trailing-comma = true
+docstring-code-format = false

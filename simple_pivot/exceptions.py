@@ -1,8 +1,8 @@
 class BaseError(Exception):
     message: str
 
-    def __init__(self):
-        super().__init__(self.message)
+    def __init__(self, *args):
+        super().__init__(" ".join([self.message, *args]))
 
 
 class AggColError(BaseError):
@@ -13,8 +13,16 @@ class AggColError(BaseError):
 
 
 class IncorrectExpressionFormatError(BaseError):
-    message = "agg_col must be column name or expression"
+    message = "agg_col must be column name or expression."
 
 
 class ValueTypeError(BaseError):
-    message = "agg_col must be str"
+    message = "agg_col must be str."
+
+
+class WrongConfigKeysError(BaseError):
+    message = "В конфигурацию сводной таблицы нельзя передать указанные ключи."
+
+
+class MissingConfigKeyError(BaseError):
+    message = "Отсутствует обязательный ключ конфигурации."

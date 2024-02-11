@@ -1,8 +1,8 @@
 from typing import List
 from pandas import DataFrame, Index, MultiIndex
 from pytest import fixture, mark
-from simple_pivot.agg_val import AggVal
 
+from simple_pivot.config import AggVal
 from simple_pivot.pivot import Config, Pivot
 
 
@@ -19,24 +19,15 @@ def dataframe() -> DataFrame:
 
 
 @fixture
-def seasons() -> DataFrame:
-    return DataFrame({
-        'season': ['summer'] * 10 + ['winter'] * 10,
-        'month': ['Jul'] * 5 + ['Aug'] * 5 + ['Jan'] * 5 + ['Feb'] * 5,
-        'v': [float(i) for i in range(20)],
-        'd': [50.0] * 20,
-    })
-
-
-@fixture
 def pivot(dataframe) -> Pivot:
-    pivot = Pivot(Config(
-        rows="a",
-        cols="b",
-        vals=["m", "n"]
-    ))
-    pivot._data = dataframe
-    return pivot
+    return Pivot(
+        config={
+            "rows": "a",
+            "cols": "b",
+            "vals": ["m", "n"],
+        },
+        source=dataframe,
+    )
 
 
 def expression(m, n):
@@ -47,7 +38,7 @@ def expression(m, n):
     "by, vals, expected", [
         (
             None,
-            [AggVal("m"), AggVal("n"), AggVal(expression)],
+            [AggVal(val="m"), AggVal(val="n"), AggVal(val=expression)],
             DataFrame({
                 "sum of m": [28.0],
                 "sum of n": [80.0],
@@ -57,11 +48,11 @@ def expression(m, n):
         (
             None,
             [
-                AggVal("m"),
-                AggVal("n"),
-                AggVal("m", agg_func="mean"),
-                AggVal("m", agg_func="mean", name="AVERAGE DUE"),
-                AggVal(expression),
+                AggVal(val="m"),
+                AggVal(val="n"),
+                AggVal(val="m", agg_func="mean"),
+                AggVal(val="m", agg_func="mean", name="AVERAGE DUE"),
+                AggVal(val=expression),
             ],
             DataFrame({
                 "sum of m": [28.0],
@@ -73,7 +64,7 @@ def expression(m, n):
         ),
         (
             "a",
-            [AggVal("m"), AggVal("n"), AggVal(expression)],
+            [AggVal(val="m"), AggVal(val="n"), AggVal(val=expression)],
             DataFrame({
                 "sum of m": [6.0, 22.0],
                 "sum of n": [40.0, 40.0],
@@ -83,11 +74,11 @@ def expression(m, n):
         (
             "a",
             [
-                AggVal("m"),
-                AggVal("n"),
-                AggVal("m", agg_func="mean"),
-                AggVal("m", agg_func="mean", name="AVERAGE DUE"),
-                AggVal(expression),
+                AggVal(val="m"),
+                AggVal(val="n"),
+                AggVal(val="m", agg_func="mean"),
+                AggVal(val="m", agg_func="mean", name="AVERAGE DUE"),
+                AggVal(val=expression),
             ],
             DataFrame({
                 "sum of m": [6.0, 22.0],
@@ -99,7 +90,7 @@ def expression(m, n):
         ),
         (
             ["a", "b"],
-            [AggVal("m"), AggVal("n"), AggVal(expression)],
+            [AggVal(val="m"), AggVal(val="n"), AggVal(val=expression)],
             DataFrame(
                 {
                     "sum of m": [1.0, 5.0, 9.0, 13.0],
@@ -120,17 +111,15 @@ def test_aggregate(
     vals: List[AggVal],
     expected: DataFrame,
 ):    
-    pivot = Pivot(Config(rows=[], vals=vals))
+    pivot = Pivot(config={"rows": [], "vals": vals})
     actual = pivot._aggregate(dataframe, by=by)
     assert actual.equals(expected)
 
 
 @mark.parametrize(
-    "rows, cols, vals, expected", [
+    "config, expected", [
         (
-            ["a"],
-            ["b"],
-            [AggVal("m")],
+            {"vals": "m", "rows": "a", "cols": "b"},
             DataFrame(
                 [
                     [1.0, 5.0, 6.0],
@@ -146,9 +135,7 @@ def test_aggregate(
             ),
         ),
         (
-            ["a", "b"],
-            None,
-            [AggVal("m")],
+            {"vals": "m", "rows": ["a", "b"]},
             DataFrame(
                 {"sum of m": [1.0, 5.0, 9.0, 13.0, 28.0]},
                 index=MultiIndex.from_tuples([
@@ -162,9 +149,7 @@ def test_aggregate(
             ),
         ),
         (
-            ["a"],
-            None,
-            [AggVal("m")],
+            {"vals": "m", "rows": ["a"]},
             DataFrame(
                 {"sum of m": [6.0, 22.0, 28.0]},
                 index=Index(["a", "b", "Total"], name="a"),
@@ -172,9 +157,13 @@ def test_aggregate(
             ),
         ),
         (
-            ["a"],
-            None,
-            [AggVal(lambda m, n: m/n, name="ratio")],
+            {
+                "vals": {
+                    "val": lambda m, n: m/n,
+                    "name": "ratio",
+                },
+                "rows": "a",
+            },
             DataFrame(
                 [[0.15], [0.55], [0.35]],
                 index=Index(["a", "b", "Total"], name="a"),
@@ -184,37 +173,14 @@ def test_aggregate(
     ]
 )
 def test_make_pivot(
-    rows: List[str],
-    cols: List[str],
-    vals: List[str],
+    config: dict,
     expected: DataFrame,
     dataframe: DataFrame,
-    pivot: Pivot
 ):
-    pivot._data = dataframe
-    pivot._config._rows = rows
-    pivot._config._cols = cols
-    pivot._config._vals = vals
-    actual = pivot._make_pivot()
-    assert actual.equals(expected)
-
-
-@mark.skip()
-def test_make_pivot_2(seasons: DataFrame):
-    expected = DataFrame(
-        {"sum of v": [45.0, 145.0, 190.0], "sum of d": [45.0, 145.0, 190.0]},
-        index=Index(["summer", "winter", "Total"], name="season"),
-        columns=Index(["v"], name="Values"),
-    )
-
     pivot = Pivot(
-        Config(
-            vals=[AggVal("v"), AggVal("d")],
-            rows=["season"],
-            cols=["month"],
-        ),
-        source=seasons,
+        config=config,
+        source=dataframe,
     )
-
-    actual = pivot.show()
+    
+    actual = pivot._make_pivot()
     assert actual.equals(expected)
