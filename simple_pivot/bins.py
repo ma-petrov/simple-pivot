@@ -2,11 +2,7 @@ from typing import Any, Iterable
 from pandas import DataFrame
 
 
-def search_bin_index(
-    l: Iterable,
-    f: callable,
-    target: Any,
-) -> int:
+def search_bin_index(l: Iterable, f: callable, target: Any) -> int:
     """Ищет индекс элемента итерируемого объекта такого, что значение функции f
     от l и элемента по этому индексу равно или приближено target.
 
@@ -14,11 +10,11 @@ def search_bin_index(
     значение функции будет наиболее приближенно к target снизу. Функция f
     должна содержать два аргумента, объект в котором выполняется поиск, индекс
     элемента.
-    
+
     :param l: итерируемый объект, в котором выполняется поиск.
     :param f: функция таргета.
     :param t: значение таргета.
-    
+
     :return: индекс элемента
     """
     left, right, middle = 0, len(l), len(l) // 2
@@ -31,26 +27,23 @@ def search_bin_index(
             left = middle + 1
         else:
             right = middle - 1
-        
+
         middle = (left + right) // 2
-        
+
     return middle
 
 
 def sum_of_slice(l: Iterable, i: int) -> Any:
     """Возвращает сумму элементов итерируемого объекта с 0 по i элемент."""
-    return sum(l[:i + 1])
+    return sum(l[: i + 1])
 
 
 def make_bins_by_agg_col(
-    data: DataFrame,
-    binning_col: str,
-    agg_col: str,
-    nbins: int = None,
+    data: DataFrame, binning_col: str, agg_col: str, nbins: int = None
 ) -> list[Any]:
     """Вычисляет значения грниц бинов колонки binnig_col на освное равномерного
     распределения суммы в каждом бине колонки agg_col.
-    
+
     :param data: датафрейм.
     :param binnig_col: название колонки, которую нужно разбить на бины.
     :param agg_col: название колонки, сумма значений которой дложна равномерно

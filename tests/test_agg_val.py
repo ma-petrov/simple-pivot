@@ -8,6 +8,7 @@ from simple_pivot.config import AggVal
 def expression() -> Callable:
     def past_due_ratio(past_due: float, outstanding: float) -> float:
         return past_due / outstanding
+
     return past_due_ratio
 
 
@@ -64,7 +65,9 @@ def test_init__expression_col__name_passed(expression: Callable):
 
 
 def test_init__expression_col__agg_func_name_passed(expression: Callable):
-    agg_val = AggVal(val=expression, agg_func="mean", name="MEAN(Past Due Ratio)")
+    agg_val = AggVal(
+        val=expression, agg_func="mean", name="MEAN(Past Due Ratio)"
+    )
     assert agg_val.val == expression
     assert agg_val.agg_func == "mean"
     assert agg_val.name == "MEAN(Past Due Ratio)"
@@ -73,7 +76,7 @@ def test_init__expression_col__agg_func_name_passed(expression: Callable):
 
 def test_get_cols_to_aggregate__str_col():
     agg_val = AggVal(val="outstanding")
-    assert agg_val.get_cols_to_aggregate() == {'outstanding': 'sum'}
+    assert agg_val.get_cols_to_aggregate() == {"outstanding": "sum"}
 
 
 def test_get_cols_to_aggregate__expression_col(expression):
