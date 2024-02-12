@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "simple-pivot"
-version = "0.2.0"
+version = "0.2.1"
 description = "Make pivots like in Excel"
 authors = ["Petrov Mikhail <petrov.ma@icloud.com>"]
 license = "MIT"
