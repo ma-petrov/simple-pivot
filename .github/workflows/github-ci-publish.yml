@@ -9,11 +9,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      - name: Install dependencies
+      - name: Publish
         run: |
-          pip install poetry==1.6.1
-          poetry run update
-      - name: Build and deploy
-        run: |
+          pip install twine poetry==1.6.1
           poetry build
           poetry publish --username __token__ --password ${{ secrets.PYPI_TOKEN }}
