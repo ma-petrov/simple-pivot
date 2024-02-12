@@ -11,7 +11,8 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: |
-          pip install
+          pip install poetry
+          poetry install
       - name: Lint with ruff
         run: ruff --output-format=github .
       - name: Test with pytest
