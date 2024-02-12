@@ -14,6 +14,6 @@ jobs:
           pip install poetry
           poetry install
       - name: Lint with ruff
-        run: ruff --output-format=github .
+        run: pytohn -m ruff --output-format=github .
       - name: Test with pytest
-        run: pytest
+        run: pytohn -m pytest
